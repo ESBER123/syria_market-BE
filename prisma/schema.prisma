@@ -1,0 +1,171 @@
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+model User {
+  id               Int        @id @default(autoincrement())
+  name             String
+  email            String     @unique
+  password         String
+  phone            String?    @unique
+  city             String?
+  avatar           String?
+  role             UserRole   @default(USER)
+  createdAt        DateTime   @default(now())
+  updatedAt        DateTime   @updatedAt
+  favorites        Favorite[]
+  receivedMessages Message[]  @relation("ReceivedMessages")
+  sentMessages     Message[]  @relation("SentMessages")
+  sentOffers       Offer[]    @relation("BuyerOffers")
+  receivedOffers   Offer[]    @relation("SellerOffers")
+  buyerOrders      Order[]    @relation("BuyerOrders")
+  sellerOrders     Order[]    @relation("SellerOrders")
+  products         Product[]
+  reviewsGiven     Review[]   @relation("ReviewsGiven")
+  reviewsReceived  Review[]   @relation("ReviewsReceived")
+}
+
+model Category {
+  id        Int       @id @default(autoincrement())
+  name      String    @unique
+  createdAt DateTime  @default(now())
+  products  Product[]
+}
+
+model Product {
+  id          Int              @id @default(autoincrement())
+  title       String
+  description String?
+  price       Decimal          @db.Decimal(12, 2)
+  condition   ProductCondition
+  status      ProductStatus    @default(ACTIVE)
+  size        String?
+  brand       String?
+  city        String?
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+  sellerId    Int
+  categoryId  Int
+  favorites   Favorite[]
+  offers      Offer[]
+  order       Order?
+  category    Category         @relation(fields: [categoryId], references: [id])
+  seller      User             @relation(fields: [sellerId], references: [id], onDelete: Cascade)
+  images      ProductImage[]
+}
+
+model ProductImage {
+  id        Int      @id @default(autoincrement())
+  url       String
+  productId Int
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+}
+
+model Favorite {
+  id        Int      @id @default(autoincrement())
+  userId    Int
+  productId Int
+  createdAt DateTime @default(now())
+  product   Product  @relation(fields: [productId], references: [id], onDelete: Cascade)
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([userId, productId])
+}
+
+model Offer {
+  id            Int         @id @default(autoincrement())
+  offeredPrice  Decimal     @db.Decimal(12, 2)
+  status        OfferStatus @default(PENDING)
+  buyerId       Int
+  sellerId      Int
+  productId     Int
+  parentOfferId Int?
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+  buyer         User        @relation("BuyerOffers", fields: [buyerId], references: [id])
+  parentOffer   Offer?      @relation("CounterOffers", fields: [parentOfferId], references: [id])
+  counterOffers Offer[]     @relation("CounterOffers")
+  product       Product     @relation(fields: [productId], references: [id])
+  seller        User        @relation("SellerOffers", fields: [sellerId], references: [id])
+}
+
+model Order {
+  id        Int         @id @default(autoincrement())
+  price     Decimal     @db.Decimal(12, 2)
+  status    OrderStatus @default(PENDING)
+  buyerId   Int
+  sellerId  Int
+  productId Int         @unique
+  createdAt DateTime    @default(now())
+  updatedAt DateTime    @updatedAt
+  buyer     User        @relation("BuyerOrders", fields: [buyerId], references: [id])
+  product   Product     @relation(fields: [productId], references: [id])
+  seller    User        @relation("SellerOrders", fields: [sellerId], references: [id])
+  review    Review?
+}
+
+model Review {
+  id         Int      @id @default(autoincrement())
+  rating     Int
+  comment    String?
+  reviewerId Int
+  sellerId   Int
+  createdAt  DateTime @default(now())
+  orderId    Int      @unique
+  order      Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  reviewer   User     @relation("ReviewsGiven", fields: [reviewerId], references: [id])
+  seller     User     @relation("ReviewsReceived", fields: [sellerId], references: [id])
+}
+
+model Message {
+  id         Int      @id @default(autoincrement())
+  text       String
+  senderId   Int
+  receiverId Int
+  createdAt  DateTime @default(now())
+  receiver   User     @relation("ReceivedMessages", fields: [receiverId], references: [id])
+  sender     User     @relation("SentMessages", fields: [senderId], references: [id])
+}
+
+enum UserRole {
+  USER
+  ADMIN
+}
+
+enum ProductCondition {
+  NEW
+  LIKE_NEW
+  GOOD
+  FAIR
+  POOR
+}
+
+enum ProductStatus {
+  ACTIVE
+  SOLD
+  RESERVED
+  HIDDEN
+}
+
+enum OfferStatus {
+  PENDING
+  ACCEPTED
+  REJECTED
+  COUNTERED
+  EXPIRED
+  CANCELLED
+}
+
+enum OrderStatus {
+  PENDING
+  CONFIRMED
+  SHIPPED
+  DELIVERED
+  CANCELLED
+}
